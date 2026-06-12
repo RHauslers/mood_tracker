@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1115" />
+  <title>Mood & Weather</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <h1>Mood &amp; Weather</h1>
+      <p id="status" class="status">How do you feel today?</p>
+    </header>
+
+    <section id="view-log" class="view active">
+      <div class="buttons">
+        <button id="btn-good" class="mood-btn good" aria-label="I feel good today">
+          <span class="emoji">😊</span>
+          <span class="label">Good day</span>
+        </button>
+        <button id="btn-bad" class="mood-btn bad" aria-label="I feel bad today">
+          <span class="emoji">😞</span>
+          <span class="label">Bad day</span>
+        </button>
+      </div>
+      <div id="today-card" class="card hidden"></div>
+    </section>
+
+    <section id="view-history" class="view">
+      <h2>History <span id="entry-count" class="pill"></span></h2>
+      <div id="history-list" class="list"></div>
+    </section>
+
+    <section id="view-predict" class="view">
+      <h2>Forecast predictions</h2>
+      <p id="predict-info" class="muted"></p>
+      <div id="predict-list" class="list"></div>
+      <div id="insights" class="card hidden"></div>
+    </section>
+
+    <nav class="tabs">
+      <button class="tab active" data-view="view-log">Log</button>
+      <button class="tab" data-view="view-history">History</button>
+      <button class="tab" data-view="view-predict">Predict</button>
+    </nav>
+  </main>
+
+  <script src="weather.js"></script>
+  <script src="model.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
