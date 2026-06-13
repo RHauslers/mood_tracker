@@ -59,39 +59,49 @@ const Weather = (() => {
     };
   }
 
-  // Historical weather for a specific date (max 30 days back)
-  async function getHistorical(lat, lon, date) {
+  // Historical weather for a specific date+time (hourly resolution)
+  async function getHistorical(lat, lon, date, time) {
+    const start = date;
+    const end = date;
     const wxUrl =
       `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
-      `&start_date=${date}&end_date=${date}` +
-      `&daily=temperature_2m_mean,relative_humidity_2m_mean,surface_pressure_mean,cloud_cover_mean,wind_speed_10m_mean,precipitation_sum,uv_index_max` +
+      `&start_date=${start}&end_date=${end}` +
+      `&hourly=temperature_2m,relative_humidity_2m,surface_pressure,cloud_cover,wind_speed_10m,precipitation,uv_index` +
       `&timezone=auto`;
     const aqUrl =
       `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
-      `&start_date=${date}&end_date=${date}` +
-      `&daily=pm2_5,pm10,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen` +
+      `&start_date=${start}&end_date=${end}` +
+      `&hourly=pm2_5,pm10,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen` +
       `&timezone=auto`;
 
     const [wx, aq] = await Promise.all([fetchJSON(wxUrl), fetchJSON(aqUrl)]);
-    const w = wx.daily, a = aq.daily;
+    const w = wx.hourly, a = aq.hourly;
+
+    // If time provided, find the nearest hour; otherwise use midday average
+    let idx = Math.floor(w.time.length / 2); // default: middle of day
+    if (time) {
+      const target = new Date(`${date}T${time}`);
+      const diffs = w.time.map((t) => Math.abs(new Date(t).getTime() - target.getTime()));
+      idx = diffs.indexOf(Math.min(...diffs));
+    }
 
     return {
-      temperature: w.temperature_2m_mean[0],
-      humidity: w.relative_humidity_2m_mean[0],
-      pressure: w.surface_pressure_mean[0],
-      cloudcover: w.cloud_cover_mean[0],
-      windspeed: w.wind_speed_10m_mean[0],
-      precipitation: w.precipitation_sum[0],
-      uv_index: w.uv_index_max[0],
-      pm2_5: a.pm2_5?.[0] ?? 0,
-      pm10: a.pm10?.[0] ?? 0,
-      ozone: a.ozone?.[0] ?? 0,
-      alder_pollen: a.alder_pollen?.[0] ?? 0,
-      birch_pollen: a.birch_pollen?.[0] ?? 0,
-      grass_pollen: a.grass_pollen?.[0] ?? 0,
-      mugwort_pollen: a.mugwort_pollen?.[0] ?? 0,
-      olive_pollen: a.olive_pollen?.[0] ?? 0,
-      ragweed_pollen: a.ragweed_pollen?.[0] ?? 0
+      temperature: w.temperature_2m[idx],
+      humidity: w.relative_humidity_2m[idx],
+      pressure: w.surface_pressure[idx],
+      cloudcover: w.cloud_cover[idx],
+      windspeed: w.wind_speed_10m[idx],
+      precipitation: w.precipitation[idx],
+      uv_index: w.uv_index[idx],
+      pm2_5: a.pm2_5?.[idx] ?? 0,
+      pm10: a.pm10?.[idx] ?? 0,
+      ozone: a.ozone?.[idx] ?? 0,
+      alder_pollen: a.alder_pollen?.[idx] ?? 0,
+      birch_pollen: a.birch_pollen?.[idx] ?? 0,
+      grass_pollen: a.grass_pollen?.[idx] ?? 0,
+      mugwort_pollen: a.mugwort_pollen?.[idx] ?? 0,
+      olive_pollen: a.olive_pollen?.[idx] ?? 0,
+      ragweed_pollen: a.ragweed_pollen?.[idx] ?? 0
     };
   }
 

@@ -43,14 +43,14 @@ function setButtonsDisabled(disabled) {
 
 /* ---------- Logging ---------- */
 
-async function logMood(mood, date, weather) {
+async function logMood(mood, date, weather, lat, lon) {
   setButtonsDisabled(true);
   setStatus("Saving entry…");
   try {
     const entries = loadEntries();
     const targetDate = date || new Date().toISOString().slice(0, 10);
     const existing = entries.findIndex((e) => e.date === targetDate);
-    const entry = { date: targetDate, mood, lat: null, lon: null, weather, ts: Date.now() };
+    const entry = { date: targetDate, mood, lat: lat ?? null, lon: lon ?? null, weather, ts: Date.now() };
     if (existing >= 0) entries[existing] = entry;
     else entries.push(entry);
     saveEntries(entries);
@@ -78,7 +78,7 @@ async function logMoodToday(mood) {
     const { lat, lon } = await Weather.getPosition();
     setStatus("Fetching weather data…");
     const weather = await Weather.getCurrent(lat, lon);
-    await logMood(mood, null, weather);
+    await logMood(mood, null, weather, lat, lon);
   } catch (err) {
     setStatus("⚠️ " + err.message);
     setButtonsDisabled(false);
@@ -206,10 +206,9 @@ $("btn-past").addEventListener("click", () => {
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() - 1);
     $("date-input").max = maxDate.toISOString().slice(0, 10);
-    const minDate = new Date();
-    minDate.setDate(minDate.getDate() - 30);
-    $("date-input").min = minDate.toISOString().slice(0, 10);
+    // No min date — allow any past date
     $("date-input").value = maxDate.toISOString().slice(0, 10);
+    $("time-input").value = "";
     $("btn-fetch-past").disabled = false;
     $("past-preview").classList.add("hidden");
   }
@@ -220,22 +219,28 @@ $("date-input").addEventListener("change", () => {
   $("past-preview").classList.add("hidden");
 });
 
+$("time-input").addEventListener("change", () => {
+  $("past-preview").classList.add("hidden");
+});
+
 $("btn-fetch-past").addEventListener("click", async () => {
   const date = $("date-input").value;
+  const time = $("time-input").value;
   if (!date) return;
   setButtonsDisabled(true);
   setStatus("Getting your location…");
   try {
     const { lat, lon } = await Weather.getPosition();
     setStatus("Fetching historical weather…");
-    const weather = await Weather.getHistorical(lat, lon, date);
+    const weather = await Weather.getHistorical(lat, lon, date, time);
     const preview = $("past-preview");
     const rows = Object.keys(FEATURE_LABELS)
       .filter((k) => weather[k] !== undefined && weather[k] !== null)
       .map((k) => `<div class="kv"><span>${FEATURE_LABELS[k]}</span><span>${round1(weather[k])}</span></div>`)
       .join("");
+    const label = time ? `${date} at ${time}` : date;
     preview.innerHTML = `
-      <h4>Weather for ${date}</h4>
+      <h4>Weather for ${label}</h4>
       <div class="weather-grid">${rows}</div>
       <div class="buttons" style="margin-top:16px">
         <button class="mood-btn good" style="flex:1" onclick="savePastEntry('good', '${date}', ${JSON.stringify(weather).replace(/"/g, "&quot;")})">
@@ -258,7 +263,8 @@ $("btn-fetch-past").addEventListener("click", async () => {
 });
 
 window.savePastEntry = async (mood, date, weather) => {
-  await logMood(mood, date, weather);
+  const { lat, lon } = await Weather.getPosition();
+  await logMood(mood, date, weather, lat, lon);
 };
 
 if ("serviceWorker" in navigator) {

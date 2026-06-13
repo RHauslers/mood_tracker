@@ -93,7 +93,7 @@ html, body {
 }
 .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-#date-input {
+#date-input, #time-input {
   width: 100%;
   padding: 10px;
   border: 1px solid #2a2e38;
@@ -103,7 +103,7 @@ html, body {
   font-size: 0.95rem;
   margin: 12px 0;
 }
-#date-input:focus { outline: none; border-color: var(--accent); }
+#date-input:focus, #time-input:focus { outline: none; border-color: var(--accent); }
 
 .card {
   background: var(--card);
