@@ -43,29 +43,44 @@ function setButtonsDisabled(disabled) {
 
 /* ---------- Logging ---------- */
 
-async function logMood(mood) {
+async function logMood(mood, date, weather) {
+  setButtonsDisabled(true);
+  setStatus("Saving entry…");
+  try {
+    const entries = loadEntries();
+    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const existing = entries.findIndex((e) => e.date === targetDate);
+    const entry = { date: targetDate, mood, lat: null, lon: null, weather, ts: Date.now() };
+    if (existing >= 0) entries[existing] = entry;
+    else entries.push(entry);
+    saveEntries(entries);
+
+    if (!date) {
+      setStatus(existing >= 0 ? "Today's entry updated." : "Entry saved!");
+      renderTodayCard(entry);
+    } else {
+      setStatus("Past entry saved!");
+      $("past-picker").classList.add("hidden");
+    }
+    renderHistory();
+    renderPredictions();
+  } catch (err) {
+    setStatus("⚠️ " + err.message);
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
+async function logMoodToday(mood) {
   setButtonsDisabled(true);
   setStatus("Getting your location…");
   try {
     const { lat, lon } = await Weather.getPosition();
     setStatus("Fetching weather data…");
     const weather = await Weather.getCurrent(lat, lon);
-
-    const entries = loadEntries();
-    const today = new Date().toISOString().slice(0, 10);
-    const existing = entries.findIndex((e) => e.date === today);
-    const entry = { date: today, mood, lat, lon, weather, ts: Date.now() };
-    if (existing >= 0) entries[existing] = entry;
-    else entries.push(entry);
-    saveEntries(entries);
-
-    setStatus(existing >= 0 ? "Today's entry updated." : "Entry saved!");
-    renderTodayCard(entry);
-    renderHistory();
-    renderPredictions();
+    await logMood(mood, null, weather);
   } catch (err) {
     setStatus("⚠️ " + err.message);
-  } finally {
     setButtonsDisabled(false);
   }
 }
@@ -181,8 +196,70 @@ document.querySelectorAll(".tab").forEach((tab) =>
   })
 );
 
-$("btn-good").addEventListener("click", () => logMood("good"));
-$("btn-bad").addEventListener("click", () => logMood("bad"));
+$("btn-good").addEventListener("click", () => logMoodToday("good"));
+$("btn-bad").addEventListener("click", () => logMoodToday("bad"));
+
+// Past day logging
+$("btn-past").addEventListener("click", () => {
+  $("past-picker").classList.toggle("hidden");
+  if (!$("past-picker").classList.contains("hidden")) {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() - 1);
+    $("date-input").max = maxDate.toISOString().slice(0, 10);
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() - 30);
+    $("date-input").min = minDate.toISOString().slice(0, 10);
+    $("date-input").value = maxDate.toISOString().slice(0, 10);
+    $("btn-fetch-past").disabled = false;
+    $("past-preview").classList.add("hidden");
+  }
+});
+
+$("date-input").addEventListener("change", () => {
+  $("btn-fetch-past").disabled = !$("date-input").value;
+  $("past-preview").classList.add("hidden");
+});
+
+$("btn-fetch-past").addEventListener("click", async () => {
+  const date = $("date-input").value;
+  if (!date) return;
+  setButtonsDisabled(true);
+  setStatus("Getting your location…");
+  try {
+    const { lat, lon } = await Weather.getPosition();
+    setStatus("Fetching historical weather…");
+    const weather = await Weather.getHistorical(lat, lon, date);
+    const preview = $("past-preview");
+    const rows = Object.keys(FEATURE_LABELS)
+      .filter((k) => weather[k] !== undefined && weather[k] !== null)
+      .map((k) => `<div class="kv"><span>${FEATURE_LABELS[k]}</span><span>${round1(weather[k])}</span></div>`)
+      .join("");
+    preview.innerHTML = `
+      <h4>Weather for ${date}</h4>
+      <div class="weather-grid">${rows}</div>
+      <div class="buttons" style="margin-top:16px">
+        <button class="mood-btn good" style="flex:1" onclick="savePastEntry('good', '${date}', ${JSON.stringify(weather).replace(/"/g, "&quot;")})">
+          <span class="emoji">😊</span>
+          <span class="label">Good day</span>
+        </button>
+        <button class="mood-btn bad" style="flex:1" onclick="savePastEntry('bad', '${date}', ${JSON.stringify(weather).replace(/"/g, "&quot;")})">
+          <span class="emoji">😞</span>
+          <span class="label">Bad day</span>
+        </button>
+      </div>
+    `;
+    preview.classList.remove("hidden");
+    setStatus("");
+  } catch (err) {
+    setStatus("⚠️ " + err.message);
+  } finally {
+    setButtonsDisabled(false);
+  }
+});
+
+window.savePastEntry = async (mood, date, weather) => {
+  await logMood(mood, date, weather);
+};
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});

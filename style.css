@@ -64,6 +64,47 @@ html, body {
 .mood-btn.good { background: linear-gradient(160deg, var(--good), var(--good-dark)); }
 .mood-btn.bad { background: linear-gradient(160deg, var(--bad), var(--bad-dark)); }
 
+.secondary-btn {
+  background: var(--card);
+  border: 1px solid #2a2e38;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 12px;
+  transition: background 0.2s ease;
+}
+.secondary-btn:hover { background: #21252c; }
+
+.primary-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 12px;
+}
+.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#date-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #2a2e38;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  margin: 12px 0;
+}
+#date-input:focus { outline: none; border-color: var(--accent); }
+
 .card {
   background: var(--card);
   border-radius: var(--radius);

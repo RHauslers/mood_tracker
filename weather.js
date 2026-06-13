@@ -59,6 +59,42 @@ const Weather = (() => {
     };
   }
 
+  // Historical weather for a specific date (max 30 days back)
+  async function getHistorical(lat, lon, date) {
+    const wxUrl =
+      `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
+      `&start_date=${date}&end_date=${date}` +
+      `&daily=temperature_2m_mean,relative_humidity_2m_mean,surface_pressure_mean,cloud_cover_mean,wind_speed_10m_mean,precipitation_sum,uv_index_max` +
+      `&timezone=auto`;
+    const aqUrl =
+      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+      `&start_date=${date}&end_date=${date}` +
+      `&daily=pm2_5,pm10,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen` +
+      `&timezone=auto`;
+
+    const [wx, aq] = await Promise.all([fetchJSON(wxUrl), fetchJSON(aqUrl)]);
+    const w = wx.daily, a = aq.daily;
+
+    return {
+      temperature: w.temperature_2m_mean[0],
+      humidity: w.relative_humidity_2m_mean[0],
+      pressure: w.surface_pressure_mean[0],
+      cloudcover: w.cloud_cover_mean[0],
+      windspeed: w.wind_speed_10m_mean[0],
+      precipitation: w.precipitation_sum[0],
+      uv_index: w.uv_index_max[0],
+      pm2_5: a.pm2_5?.[0] ?? 0,
+      pm10: a.pm10?.[0] ?? 0,
+      ozone: a.ozone?.[0] ?? 0,
+      alder_pollen: a.alder_pollen?.[0] ?? 0,
+      birch_pollen: a.birch_pollen?.[0] ?? 0,
+      grass_pollen: a.grass_pollen?.[0] ?? 0,
+      mugwort_pollen: a.mugwort_pollen?.[0] ?? 0,
+      olive_pollen: a.olive_pollen?.[0] ?? 0,
+      ragweed_pollen: a.ragweed_pollen?.[0] ?? 0
+    };
+  }
+
   // 7-day forecast, one feature vector per day (daytime averages)
   async function getForecast(lat, lon) {
     const wxUrl =
@@ -102,5 +138,5 @@ const Weather = (() => {
     });
   }
 
-  return { FEATURES, getPosition, getCurrent, getForecast };
+  return { FEATURES, getPosition, getCurrent, getHistorical, getForecast };
 })();

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Past Day UI</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>body { max-width: 480px; margin: 0 auto; padding: 16px; }</style>
+</head>
+<body>
+  <section id="view-log">
+    <div class="buttons">
+      <button class="mood-btn good">
+        <span class="emoji">😊</span>
+        <span class="label">Good day</span>
+      </button>
+      <button class="mood-btn bad">
+        <span class="emoji">😞</span>
+        <span class="label">Bad day</span>
+      </button>
+    </div>
+    <button id="btn-past" class="secondary-btn">Add past day</button>
+    <div id="past-picker" class="card hidden">
+      <h3>Pick a date</h3>
+      <input type="date" id="date-input" max="" aria-label="Pick a past date" />
+      <button id="btn-fetch-past" class="primary-btn" disabled>Get weather</button>
+      <div id="past-preview" class="hidden"></div>
+    </div>
+  </section>
+  <script src="weather.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
