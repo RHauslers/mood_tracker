@@ -328,8 +328,8 @@ $("btn-save-user").addEventListener("click", () => {
   Sync.saveToken(t);
   $("sync-username").classList.add("saved");
   $("sync-token").classList.add("saved");
-  // Clear cached gist ID when credentials change
-  Sync.saveGistId("");
+  // Clear cached gist ID for this username when credentials change
+  Sync.saveGistId(u, "");
   setSyncStatus("Saved. Ready to Push ↑ or Pull ↓");
 });
 

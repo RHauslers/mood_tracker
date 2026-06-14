@@ -7,15 +7,15 @@ const Sync = (() => {
   const TOKENKEY = "mood_sync_token";
   const GISTKEY  = "mood_sync_gist_id";
   const LASTKEY  = "mood_sync_last";
-  const FILENAME = "mood_entries.json";
+  function filename(username) { return "mood_" + username.toLowerCase().trim().replace(/[^a-z0-9]/g, "_") + ".json"; }
   const API      = "https://api.github.com";
 
   function getUsername()  { return localStorage.getItem(USERKEY)  || ""; }
   function getToken()     { return localStorage.getItem(TOKENKEY) || ""; }
-  function getGistId()    { return localStorage.getItem(GISTKEY)  || ""; }
+  function getGistId(u)   { return localStorage.getItem(GISTKEY + "_" + u.toLowerCase().trim()) || ""; }
   function saveUsername(u){ localStorage.setItem(USERKEY,  u.trim()); }
   function saveToken(t)   { localStorage.setItem(TOKENKEY, t.trim()); }
-  function saveGistId(id) { localStorage.setItem(GISTKEY,  id); }
+  function saveGistId(u, id) { localStorage.setItem(GISTKEY + "_" + u.toLowerCase().trim(), id); }
   function getLastSync()  { return localStorage.getItem(LASTKEY)  || null; }
   function setLastSync(a) { localStorage.setItem(LASTKEY, a + " at " + new Date().toLocaleTimeString()); }
 
@@ -39,15 +39,16 @@ const Sync = (() => {
 
   // Find existing mood gist or create one; returns gist ID
   async function getOrCreateGist(token, username) {
-    const stored = getGistId();
+    const fn = filename(username);
+    const stored = getGistId(username);
     if (stored) return stored;
 
-    // Search existing gists for one with our filename
+    // Search existing gists for one with our username-specific filename
     const listRes = await fetch(`${API}/gists`, { headers: headers(token) });
     if (!listRes.ok) throw new Error("Token invalid or no gist access (" + listRes.status + ")");
     const gists = await listRes.json();
-    const existing = gists.find((g) => g.files && g.files[FILENAME]);
-    if (existing) { saveGistId(existing.id); return existing.id; }
+    const existing = gists.find((g) => g.files && g.files[fn]);
+    if (existing) { saveGistId(username, existing.id); return existing.id; }
 
     // Create a new private gist
     const createRes = await fetch(`${API}/gists`, {
@@ -56,22 +57,23 @@ const Sync = (() => {
       body: JSON.stringify({
         description: "Mood & Weather data for " + username,
         public: false,
-        files: { [FILENAME]: { content: JSON.stringify([]) } }
+        files: { [fn]: { content: JSON.stringify([]) } }
       })
     });
     if (!createRes.ok) throw new Error("Could not create gist (" + createRes.status + ")");
     const created = await createRes.json();
-    saveGistId(created.id);
+    saveGistId(username, created.id);
     return created.id;
   }
 
   // Push: overwrite gist with local entries
   async function push(token, username, entries) {
+    const fn = filename(username);
     const gistId = await getOrCreateGist(token, username);
     const res = await fetch(`${API}/gists/${gistId}`, {
       method: "PATCH",
       headers: headers(token),
-      body: JSON.stringify({ files: { [FILENAME]: { content: JSON.stringify(entries) } } })
+      body: JSON.stringify({ files: { [fn]: { content: JSON.stringify(entries) } } })
     });
     if (!res.ok) throw new Error("Push failed (" + res.status + ")");
     setLastSync("Pushed");
@@ -79,11 +81,12 @@ const Sync = (() => {
 
   // Pull: download gist entries and merge into local
   async function pull(token, username, localEntries) {
+    const fn = filename(username);
     const gistId = await getOrCreateGist(token, username);
     const res = await fetch(`${API}/gists/${gistId}`, { headers: headers(token) });
     if (!res.ok) throw new Error("Pull failed (" + res.status + ")");
     const gist = await res.json();
-    const raw = gist.files?.[FILENAME]?.content || "[]";
+    const raw = gist.files?.[fn]?.content || "[]";
     let remote;
     try { remote = JSON.parse(raw); } catch { remote = []; }
     if (!Array.isArray(remote)) remote = [];
