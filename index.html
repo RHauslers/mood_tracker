@@ -22,6 +22,17 @@
         <button id="btn-pull" class="sync-action-btn pull">Pull ↓</button>
       </div>
       <p id="sync-status" class="sync-status"></p>
+      <details class="sync-guide">
+        <summary>How to set up sync ▸</summary>
+        <ol>
+          <li>Create a free account at <a href="https://github.com/signup" target="_blank">github.com/signup</a> (skip if you have one)</li>
+          <li>Go to <a href="https://github.com/settings/tokens/new?scopes=gist&description=Mood+tracker+sync" target="_blank">github.com → Settings → Token (click here — pre-filled)</a></li>
+          <li>Scroll down, click <strong>Generate token</strong></li>
+          <li>Copy the token (starts with <code>ghp_</code>) — shown only once!</li>
+          <li>Paste it in the token field above, pick a username, hit <strong>Save</strong></li>
+          <li>Use <strong>Push ↑</strong> to upload, <strong>Pull ↓</strong> to download on another device</li>
+        </ol>
+      </details>
       <p id="status" class="status">How do you feel today?</p>
     </header>
 

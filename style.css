@@ -73,6 +73,31 @@ html, body {
 
 .sync-status { font-size: 0.75rem; color: var(--muted); margin-top: 4px; min-height: 1em; }
 
+.sync-guide {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.sync-guide summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.78rem;
+  list-style: none;
+  user-select: none;
+}
+.sync-guide summary::-webkit-details-marker { display: none; }
+.sync-guide ol {
+  margin: 8px 0 4px 16px;
+  line-height: 1.9;
+}
+.sync-guide a { color: var(--accent); }
+.sync-guide code {
+  background: #2a2e38;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.75rem;
+}
+
 .view { display: none; flex: 1; }
 .view.active { display: block; }
 
