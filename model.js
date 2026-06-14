@@ -91,21 +91,53 @@ const Model = (() => {
     return preds.every((p) => p < 0.05 || p > 0.95);
   }
 
+  // --- Derived pressure features (based on clinical research) ---
+  // pressure_delta: change vs previous day in hPa (negative = falling = bad)
+  // pressure_low:   1 if absolute pressure < 1007 hPa (migraine danger zone)
+  function addPressureFeatures(weatherArr) {
+    return weatherArr.map((w, i) => {
+      const prev = i > 0 ? weatherArr[i - 1].pressure : w.pressure;
+      const delta = (w.pressure || 0) - (prev || 0);
+      const low   = (w.pressure || 0) < 1007 ? 1 : 0;
+      return { ...w, pressure_delta: delta, pressure_low: low };
+    });
+  }
+
+  // For forecast: inject pressure delta vs last logged entry's pressure
+  function addPressureFeaturesForForecast(forecastDays, lastKnownPressure) {
+    let prev = lastKnownPressure;
+    return forecastDays.map((day) => {
+      const p = day.features.pressure || 0;
+      const delta = p - prev;
+      const low   = p < 1007 ? 1 : 0;
+      prev = p;
+      return { ...day, features: { ...day.features, pressure_delta: delta, pressure_low: low } };
+    });
+  }
+
   // --- Public train ---
   function train(entries) {
     if (entries.length < MIN_ENTRIES) return null;
     const labels = entries.map((e) => (e.mood === "good" ? 1 : 0));
     if (!labels.includes(0) || !labels.includes(1)) return null;
 
-    const rawX = entries.map((e) => featureVector(e.weather));
+    // Sort by date so pressure deltas are chronologically meaningful
+    const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const sortedLabels = sorted.map((e) => (e.mood === "good" ? 1 : 0));
+    const enrichedWeather = addPressureFeatures(sorted.map((e) => e.weather));
+
+    const rawX = enrichedWeather.map((w) => featureVector(w));
     const stats = computeStats(rawX);
     const X = rawX.map((r) => normalize(r, stats));
-    const y = labels;
+    const y = sortedLabels;
 
     const lrModel = trainLR(X, y);
     const saturated = isLRSaturated(lrModel, X);
 
-    return { lrModel, trainX: X, trainY: y, stats, saturated };
+    // Store last known pressure so forecast deltas can be computed
+    const lastPressure = sorted[sorted.length - 1].weather.pressure || 1013;
+
+    return { lrModel, trainX: X, trainY: y, stats, saturated, lastPressure };
   }
 
   // --- Public predict: ensemble LR + kNN, clamp to 5-95% ---
@@ -136,5 +168,5 @@ const Model = (() => {
     return model.saturated ? "kNN" : "Ensemble (LR + kNN)";
   }
 
-  return { MIN_ENTRIES, train, predict, insights, modelLabel };
+  return { MIN_ENTRIES, train, predict, insights, modelLabel, addPressureFeaturesForForecast };
 })();

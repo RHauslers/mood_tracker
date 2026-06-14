@@ -5,7 +5,11 @@ const Weather = (() => {
     "temperature", "humidity", "pressure", "cloudcover", "windspeed",
     "precipitation", "uv_index", "pm2_5", "pm10", "ozone",
     "alder_pollen", "birch_pollen", "grass_pollen", "mugwort_pollen",
-    "olive_pollen", "ragweed_pollen"
+    "olive_pollen", "ragweed_pollen",
+    // Derived pressure features (clinically meaningful)
+    // pressure_delta: hPa change vs previous day (negative = falling pressure)
+    // pressure_low: 1 if pressure in danger zone (<1007 hPa), else 0
+    "pressure_delta", "pressure_low"
   ];
 
   function getPosition() {

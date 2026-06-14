@@ -18,7 +18,9 @@ const FEATURE_LABELS = {
   grass_pollen: "Grass pollen",
   mugwort_pollen: "Mugwort pollen",
   olive_pollen: "Olive pollen",
-  ragweed_pollen: "Ragweed pollen"
+  ragweed_pollen: "Ragweed pollen",
+  pressure_delta: "Pressure change (hPa/day)",
+  pressure_low: "Low pressure zone"
 };
 
 const $ = (id) => document.getElementById(id);
@@ -160,7 +162,8 @@ async function renderPredictions() {
     // Use the entry with a known location; fall back to the most recent
     const withLocation = entries.slice().reverse().find((e) => e.lat && e.lon);
     const ref = withLocation || entries[entries.length - 1];
-    const forecast = await Weather.getForecast(ref.lat, ref.lon);
+    const rawForecast = await Weather.getForecast(ref.lat, ref.lon);
+    const forecast = Model.addPressureFeaturesForForecast(rawForecast, model.lastPressure);
     info.textContent = `Based on your ${entries.length} entries, likelihood each day will feel good:`;
 
     modelPill.textContent = Model.modelLabel(model);
