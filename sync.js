@@ -1,13 +1,13 @@
 /* Cloud sync via jsonstore.io — no account, no API key needed.
-   Passphrase is hashed to a UUID-style key used as the store endpoint. */
+   Username is hashed to a unique storage key. */
 
 const Sync = (() => {
   const BASE = "https://www.jsonstore.io";
-  const PASSKEY = "mood_sync_passphrase";
+  const USERKEY = "mood_sync_username";
   const LASTKEY = "mood_sync_last";
 
-  // Simple non-cryptographic hash → deterministic UUID-style string
-  function hashPassphrase(str) {
+  // Simple non-cryptographic hash → stable hex string
+  function hashUsername(str) {
     let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
     for (let i = 0; i < str.length; i++) {
       const ch = str.charCodeAt(i);
@@ -18,36 +18,30 @@ const Sync = (() => {
     h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
     const u = (h1 >>> 0).toString(16).padStart(8, "0");
     const v = (h2 >>> 0).toString(16).padStart(8, "0");
-    // produce a stable 36-char key
-    return `${u.slice(0,8)}-${v.slice(0,4)}-4${u.slice(5,8)}-${v.slice(4,8)}-${u}${v}`.slice(0, 36);
+    return `${u}${v}mood`;
   }
 
-  function endpoint(passphrase) {
-    return `${BASE}/${hashPassphrase(passphrase)}/mood_entries`;
+  function endpoint(username) {
+    return `${BASE}/${hashUsername(username.toLowerCase().trim())}/mood_entries`;
   }
 
-  function getPassphrase() {
-    return localStorage.getItem(PASSKEY) || null;
+  function getUsername() {
+    return localStorage.getItem(USERKEY) || "";
   }
 
-  function savePassphrase(p) {
-    localStorage.setItem(PASSKEY, p);
-  }
-
-  function clearPassphrase() {
-    localStorage.removeItem(PASSKEY);
-    localStorage.removeItem(LASTKEY);
+  function saveUsername(u) {
+    localStorage.setItem(USERKEY, u.trim());
   }
 
   function getLastSync() {
     return localStorage.getItem(LASTKEY) || null;
   }
 
-  function setLastSync() {
-    localStorage.setItem(LASTKEY, new Date().toLocaleString());
+  function setLastSync(action) {
+    localStorage.setItem(LASTKEY, action + " at " + new Date().toLocaleTimeString());
   }
 
-  // Merge two entry arrays: deduplicate by date, keep most recent ts
+  // Merge two arrays: deduplicate by date, keep most recent ts
   function mergeEntries(local, remote) {
     const map = new Map();
     for (const e of [...local, ...remote]) {
@@ -57,34 +51,37 @@ const Sync = (() => {
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  async function push(passphrase, entries) {
-    const res = await fetch(endpoint(passphrase), {
+  // Push: upload local entries to cloud (overwrites remote)
+  async function push(username, entries) {
+    const res = await fetch(endpoint(username), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(entries)
     });
-    if (!res.ok) throw new Error("Sync push failed: " + res.status);
-    setLastSync();
+    if (!res.ok) throw new Error("Push failed (" + res.status + ")");
+    setLastSync("Pushed");
+    return entries;
   }
 
-  async function pull(passphrase) {
-    const res = await fetch(endpoint(passphrase));
-    if (res.status === 404) return []; // no data yet
-    if (!res.ok) throw new Error("Sync pull failed: " + res.status);
+  // Pull: download cloud entries and merge into local (never deletes local data)
+  async function pull(username, localEntries) {
+    let res;
+    try {
+      res = await fetch(endpoint(username));
+    } catch (e) {
+      throw new Error("Network error — are you online?");
+    }
+    if (res.status === 404) {
+      setLastSync("Pulled (no cloud data yet)");
+      return localEntries; // nothing on cloud yet, keep local
+    }
+    if (!res.ok) throw new Error("Pull failed (" + res.status + ")");
     const json = await res.json();
-    // jsonstore wraps in { result: [...] }
-    const data = json.result;
-    if (!Array.isArray(data)) return [];
-    return data;
-  }
-
-  // Full sync: pull remote, merge with local, push merged back
-  async function syncEntries(passphrase, localEntries) {
-    const remote = await pull(passphrase);
+    const remote = Array.isArray(json.result) ? json.result : [];
     const merged = mergeEntries(localEntries, remote);
-    await push(passphrase, merged);
+    setLastSync("Pulled");
     return merged;
   }
 
-  return { getPassphrase, savePassphrase, clearPassphrase, getLastSync, syncEntries, pull };
+  return { getUsername, saveUsername, getLastSync, push, pull, mergeEntries };
 })();

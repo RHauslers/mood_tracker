@@ -66,9 +66,6 @@ async function logMood(mood, date, weather, lat, lon) {
     }
     renderHistory();
     renderPredictions();
-    // Push to cloud in the background if sync is configured
-    const _pass = Sync.getPassphrase();
-    if (_pass) doSync(_pass, true);
   } catch (err) {
     setStatus("⚠️ " + err.message);
   } finally {
@@ -284,82 +281,76 @@ $('btn-refresh').addEventListener('click', () => renderPredictions());
 
 /* ---------- Sync UI ---------- */
 
-function updateSyncButton() {
-  const btn = $("btn-sync");
-  const info = $("sync-info");
-  const passphrase = Sync.getPassphrase();
-  if (passphrase) {
-    btn.classList.add("active");
-    btn.title = "Synced — click to manage";
+function setSyncStatus(msg, isError = false) {
+  const el = $("sync-status");
+  el.textContent = msg;
+  el.style.color = isError ? "var(--bad)" : "var(--muted)";
+}
+
+function setSyncBusy(busy) {
+  $("btn-save-user").disabled = busy;
+  $("btn-push").disabled = busy;
+  $("btn-pull").disabled = busy;
+}
+
+function initSyncBar() {
+  const saved = Sync.getUsername();
+  if (saved) {
+    $("sync-username").value = saved;
+    $("sync-username").classList.add("saved");
     const last = Sync.getLastSync();
-    if (last) {
-      info.textContent = "Last sync: " + last;
-      info.classList.remove("hidden");
-    }
-  } else {
-    btn.classList.remove("active");
-    btn.title = "Sync across devices";
-    info.classList.add("hidden");
+    if (last) setSyncStatus(last);
   }
 }
 
-async function doSync(passphrase, silent = false) {
-  const btn = $("btn-sync");
-  btn.classList.add("syncing");
-  try {
-    const local = loadEntries();
-    const merged = await Sync.syncEntries(passphrase, local);
-    saveEntries(merged);
-    renderHistory();
-    renderPredictions();
-    updateSyncButton();
-    if (!silent) setStatus("Synced! " + merged.length + " entries.");
-  } catch (err) {
-    if (!silent) setStatus("⚠️ Sync failed: " + err.message);
-  } finally {
-    btn.classList.remove("syncing");
-  }
-}
+$("sync-username").addEventListener("input", () => {
+  $("sync-username").classList.remove("saved");
+  setSyncStatus("");
+});
 
-// Sync button click: open modal if no passphrase, else sync immediately
-$("btn-sync").addEventListener("click", () => {
-  if (Sync.getPassphrase()) {
-    // Show modal to allow changing/disconnecting
-    $("sync-passphrase").value = Sync.getPassphrase();
-    $("btn-sync-confirm").textContent = "Update & sync";
-    $("sync-modal-status").textContent = "";
-    $("sync-modal").classList.remove("hidden");
-  } else {
-    $("sync-passphrase").value = "";
-    $("btn-sync-confirm").textContent = "Connect";
-    $("sync-modal-status").textContent = "";
-    $("sync-modal").classList.remove("hidden");
+$("btn-save-user").addEventListener("click", () => {
+  const u = $("sync-username").value.trim();
+  if (!u) { setSyncStatus("Enter a username first.", true); return; }
+  Sync.saveUsername(u);
+  $("sync-username").classList.add("saved");
+  setSyncStatus("Username saved.");
+});
+
+$("btn-push").addEventListener("click", async () => {
+  const u = $("sync-username").value.trim();
+  if (!u) { setSyncStatus("Enter and save a username first.", true); return; }
+  Sync.saveUsername(u);
+  setSyncBusy(true);
+  setSyncStatus("Pushing…");
+  try {
+    const entries = loadEntries();
+    await Sync.push(u, entries);
+    setSyncStatus("Pushed " + entries.length + " entries ↑ " + new Date().toLocaleTimeString());
+  } catch (err) {
+    setSyncStatus("⚠️ " + err.message, true);
+  } finally {
+    setSyncBusy(false);
   }
 });
 
-$("btn-sync-skip").addEventListener("click", () => {
-  $("sync-modal").classList.add("hidden");
-});
-
-$("btn-sync-confirm").addEventListener("click", async () => {
-  const p = $("sync-passphrase").value.trim();
-  if (!p) { $("sync-modal-status").textContent = "Please enter a passphrase."; return; }
-  $("sync-modal-status").textContent = "Connecting…";
-  $("btn-sync-confirm").disabled = true;
+$("btn-pull").addEventListener("click", async () => {
+  const u = $("sync-username").value.trim();
+  if (!u) { setSyncStatus("Enter and save a username first.", true); return; }
+  Sync.saveUsername(u);
+  setSyncBusy(true);
+  setSyncStatus("Pulling…");
   try {
-    Sync.savePassphrase(p);
     const local = loadEntries();
-    const merged = await Sync.syncEntries(p, local);
+    const merged = await Sync.pull(u, local);
+    const added = merged.length - local.length;
     saveEntries(merged);
     renderHistory();
     renderPredictions();
-    updateSyncButton();
-    $("sync-modal").classList.add("hidden");
-    setStatus("Synced! " + merged.length + " entries across devices.");
+    setSyncStatus("Pulled ↓ — " + (added > 0 ? "+" + added + " new entries" : "already up to date") + " (" + new Date().toLocaleTimeString() + ")");
   } catch (err) {
-    $("sync-modal-status").textContent = "⚠️ " + err.message;
+    setSyncStatus("⚠️ " + err.message, true);
   } finally {
-    $("btn-sync-confirm").disabled = false;
+    setSyncBusy(false);
   }
 });
 
@@ -369,11 +360,7 @@ if ("serviceWorker" in navigator) {
 
 renderHistory();
 renderPredictions();
-updateSyncButton();
-
-// Auto-sync silently on load if passphrase is already set
-const _savedPass = Sync.getPassphrase();
-if (_savedPass) doSync(_savedPass, true);
+initSyncBar();
 
 const todayEntry = loadEntries().find((e) => e.date === new Date().toISOString().slice(0, 10));
 if (todayEntry) {

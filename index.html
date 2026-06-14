@@ -13,25 +13,16 @@
 <body>
   <main class="app">
     <header class="header">
-      <div class="header-row">
-        <h1>Mood &amp; Weather</h1>
-        <button id="btn-sync" class="sync-btn" title="Sync data">☁</button>
+      <h1>Mood &amp; Weather</h1>
+      <div class="sync-bar">
+        <input type="text" id="sync-username" class="sync-username-input" placeholder="Username" autocomplete="off" />
+        <button id="btn-save-user" class="sync-action-btn">Save</button>
+        <button id="btn-push" class="sync-action-btn push">Push ↑</button>
+        <button id="btn-pull" class="sync-action-btn pull">Pull ↓</button>
       </div>
-      <p id="sync-info" class="sync-info hidden"></p>
+      <p id="sync-status" class="sync-status"></p>
       <p id="status" class="status">How do you feel today?</p>
     </header>
-
-    <!-- Sync setup modal -->
-    <div id="sync-modal" class="modal-overlay hidden">
-      <div class="modal-box">
-        <h2>Sync across devices</h2>
-        <p class="muted">Enter a passphrase to link your data. Use the same passphrase on all your devices.</p>
-        <input type="text" id="sync-passphrase" class="text-input" placeholder="e.g. mysecretphrase123" autocomplete="off" />
-        <button id="btn-sync-confirm" class="primary-btn">Connect</button>
-        <button id="btn-sync-skip" class="secondary-btn">Not now</button>
-        <p id="sync-modal-status" class="muted" style="margin-top:8px;min-height:1.2em"></p>
-      </div>
-    </div>
 
     <section id="view-log" class="view active">
       <div class="buttons">
