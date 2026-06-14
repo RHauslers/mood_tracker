@@ -98,6 +98,23 @@ html, body {
   font-size: 0.75rem;
 }
 
+.bmc-wrap { text-align: center; margin-top: 24px; }
+.bmc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFDD00;
+  color: #000;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 10px 20px;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.bmc-btn:hover { opacity: 0.85; }
+.bmc-btn img { width: 20px; height: 20px; }
+
 .view { display: none; flex: 1; }
 .view.active { display: block; }
 
