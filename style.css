@@ -125,6 +125,26 @@ html, body {
 .weather-grid .kv span:first-child { color: var(--muted); }
 
 h2 { font-size: 1.1rem; margin-bottom: 12px; }
+
+.predict-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.predict-header h2 { margin-bottom: 0; }
+
+.refresh-btn {
+  background: none;
+  border: 1px solid #2a2e38;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.refresh-btn:active { opacity: 0.7; }
 .pill {
   background: var(--accent);
   color: #fff;

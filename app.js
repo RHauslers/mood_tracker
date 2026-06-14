@@ -139,7 +139,9 @@ async function renderPredictions() {
   const info = $("predict-info");
   const list = $("predict-list");
   const insightsEl = $("insights");
+  const modelPill = $("model-label");
   insightsEl.classList.add("hidden");
+  modelPill.classList.add("hidden");
   list.innerHTML = "";
 
   if (entries.length < Model.MIN_ENTRIES) {
@@ -155,9 +157,14 @@ async function renderPredictions() {
 
   info.textContent = "Training on " + entries.length + " entries… fetching forecast…";
   try {
-    const last = entries[entries.length - 1];
-    const forecast = await Weather.getForecast(last.lat, last.lon);
+    // Use the entry with a known location; fall back to the most recent
+    const withLocation = entries.slice().reverse().find((e) => e.lat && e.lon);
+    const ref = withLocation || entries[entries.length - 1];
+    const forecast = await Weather.getForecast(ref.lat, ref.lon);
     info.textContent = `Based on your ${entries.length} entries, likelihood each day will feel good:`;
+
+    modelPill.textContent = Model.modelLabel(model);
+    modelPill.classList.remove("hidden");
 
     list.innerHTML = forecast.map((day) => {
       const p = Model.predict(model, day.features);
@@ -266,6 +273,8 @@ window.savePastEntry = async (mood, date, weather) => {
   const { lat, lon } = await Weather.getPosition();
   await logMood(mood, date, weather, lat, lon);
 };
+
+$('btn-refresh').addEventListener('click', () => renderPredictions());
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});

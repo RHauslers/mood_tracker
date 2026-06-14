@@ -45,9 +45,13 @@
     </section>
 
     <section id="view-predict" class="view">
-      <h2>Forecast predictions</h2>
+      <div class="predict-header">
+        <h2>Forecast predictions</h2>
+        <button id="btn-refresh" class="refresh-btn" aria-label="Refresh predictions">↻ Refresh</button>
+      </div>
       <p id="predict-info" class="muted"></p>
-      <div id="predict-list" class="list"></div>
+      <span id="model-label" class="pill hidden"></span>
+      <div id="predict-list" class="list" style="margin-top:12px"></div>
       <div id="insights" class="card hidden"></div>
     </section>
 
