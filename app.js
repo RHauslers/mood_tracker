@@ -66,6 +66,9 @@ async function logMood(mood, date, weather, lat, lon) {
     }
     renderHistory();
     renderPredictions();
+    // Push to cloud in the background if sync is configured
+    const _pass = Sync.getPassphrase();
+    if (_pass) doSync(_pass, true);
   } catch (err) {
     setStatus("⚠️ " + err.message);
   } finally {
@@ -279,12 +282,98 @@ window.savePastEntry = async (mood, date, weather) => {
 
 $('btn-refresh').addEventListener('click', () => renderPredictions());
 
+/* ---------- Sync UI ---------- */
+
+function updateSyncButton() {
+  const btn = $("btn-sync");
+  const info = $("sync-info");
+  const passphrase = Sync.getPassphrase();
+  if (passphrase) {
+    btn.classList.add("active");
+    btn.title = "Synced — click to manage";
+    const last = Sync.getLastSync();
+    if (last) {
+      info.textContent = "Last sync: " + last;
+      info.classList.remove("hidden");
+    }
+  } else {
+    btn.classList.remove("active");
+    btn.title = "Sync across devices";
+    info.classList.add("hidden");
+  }
+}
+
+async function doSync(passphrase, silent = false) {
+  const btn = $("btn-sync");
+  btn.classList.add("syncing");
+  try {
+    const local = loadEntries();
+    const merged = await Sync.syncEntries(passphrase, local);
+    saveEntries(merged);
+    renderHistory();
+    renderPredictions();
+    updateSyncButton();
+    if (!silent) setStatus("Synced! " + merged.length + " entries.");
+  } catch (err) {
+    if (!silent) setStatus("⚠️ Sync failed: " + err.message);
+  } finally {
+    btn.classList.remove("syncing");
+  }
+}
+
+// Sync button click: open modal if no passphrase, else sync immediately
+$("btn-sync").addEventListener("click", () => {
+  if (Sync.getPassphrase()) {
+    // Show modal to allow changing/disconnecting
+    $("sync-passphrase").value = Sync.getPassphrase();
+    $("btn-sync-confirm").textContent = "Update & sync";
+    $("sync-modal-status").textContent = "";
+    $("sync-modal").classList.remove("hidden");
+  } else {
+    $("sync-passphrase").value = "";
+    $("btn-sync-confirm").textContent = "Connect";
+    $("sync-modal-status").textContent = "";
+    $("sync-modal").classList.remove("hidden");
+  }
+});
+
+$("btn-sync-skip").addEventListener("click", () => {
+  $("sync-modal").classList.add("hidden");
+});
+
+$("btn-sync-confirm").addEventListener("click", async () => {
+  const p = $("sync-passphrase").value.trim();
+  if (!p) { $("sync-modal-status").textContent = "Please enter a passphrase."; return; }
+  $("sync-modal-status").textContent = "Connecting…";
+  $("btn-sync-confirm").disabled = true;
+  try {
+    Sync.savePassphrase(p);
+    const local = loadEntries();
+    const merged = await Sync.syncEntries(p, local);
+    saveEntries(merged);
+    renderHistory();
+    renderPredictions();
+    updateSyncButton();
+    $("sync-modal").classList.add("hidden");
+    setStatus("Synced! " + merged.length + " entries across devices.");
+  } catch (err) {
+    $("sync-modal-status").textContent = "⚠️ " + err.message;
+  } finally {
+    $("btn-sync-confirm").disabled = false;
+  }
+});
+
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
 renderHistory();
 renderPredictions();
+updateSyncButton();
+
+// Auto-sync silently on load if passphrase is already set
+const _savedPass = Sync.getPassphrase();
+if (_savedPass) doSync(_savedPass, true);
 
 const todayEntry = loadEntries().find((e) => e.date === new Date().toISOString().slice(0, 10));
 if (todayEntry) {

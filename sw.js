@@ -1,9 +1,10 @@
-const CACHE = "mood-weather-v4";
+const CACHE = "mood-weather-v5";
 const ASSETS = [
   ".",
   "index.html",
   "style.css",
   "app.js",
+  "sync.js",
   "weather.js",
   "model.js",
   "manifest.json",
