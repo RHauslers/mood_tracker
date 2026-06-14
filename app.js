@@ -294,12 +294,19 @@ function setSyncBusy(busy) {
 }
 
 function initSyncBar() {
-  const saved = Sync.getUsername();
-  if (saved) {
-    $("sync-username").value = saved;
+  const savedUser = Sync.getUsername();
+  const savedToken = Sync.getToken();
+  if (savedUser) {
+    $("sync-username").value = savedUser;
     $("sync-username").classList.add("saved");
+  }
+  if (savedToken) {
+    $("sync-token").value = savedToken;
+    $("sync-token").classList.add("saved");
+  }
+  if (savedUser && savedToken) {
     const last = Sync.getLastSync();
-    if (last) setSyncStatus(last);
+    setSyncStatus(last || "Ready to sync.");
   }
 }
 
@@ -307,24 +314,34 @@ $("sync-username").addEventListener("input", () => {
   $("sync-username").classList.remove("saved");
   setSyncStatus("");
 });
+$("sync-token").addEventListener("input", () => {
+  $("sync-token").classList.remove("saved");
+  setSyncStatus("");
+});
 
 $("btn-save-user").addEventListener("click", () => {
   const u = $("sync-username").value.trim();
-  if (!u) { setSyncStatus("Enter a username first.", true); return; }
+  const t = $("sync-token").value.trim();
+  if (!u) { setSyncStatus("Enter a username.", true); return; }
+  if (!t) { setSyncStatus("Enter your GitHub token.", true); return; }
   Sync.saveUsername(u);
+  Sync.saveToken(t);
   $("sync-username").classList.add("saved");
-  setSyncStatus("Username saved.");
+  $("sync-token").classList.add("saved");
+  // Clear cached gist ID when credentials change
+  Sync.saveGistId("");
+  setSyncStatus("Saved. Ready to Push ↑ or Pull ↓");
 });
 
 $("btn-push").addEventListener("click", async () => {
   const u = $("sync-username").value.trim();
-  if (!u) { setSyncStatus("Enter and save a username first.", true); return; }
-  Sync.saveUsername(u);
+  const t = $("sync-token").value.trim();
+  if (!u || !t) { setSyncStatus("Save your username and GitHub token first.", true); return; }
   setSyncBusy(true);
   setSyncStatus("Pushing…");
   try {
     const entries = loadEntries();
-    await Sync.push(u, entries);
+    await Sync.push(t, u, entries);
     setSyncStatus("Pushed " + entries.length + " entries ↑ " + new Date().toLocaleTimeString());
   } catch (err) {
     setSyncStatus("⚠️ " + err.message, true);
@@ -335,13 +352,13 @@ $("btn-push").addEventListener("click", async () => {
 
 $("btn-pull").addEventListener("click", async () => {
   const u = $("sync-username").value.trim();
-  if (!u) { setSyncStatus("Enter and save a username first.", true); return; }
-  Sync.saveUsername(u);
+  const t = $("sync-token").value.trim();
+  if (!u || !t) { setSyncStatus("Save your username and GitHub token first.", true); return; }
   setSyncBusy(true);
   setSyncStatus("Pulling…");
   try {
     const local = loadEntries();
-    const merged = await Sync.pull(u, local);
+    const merged = await Sync.pull(t, u, local);
     const added = merged.length - local.length;
     saveEntries(merged);
     renderHistory();
