@@ -29,16 +29,18 @@ const Model = (() => {
 
   // --- Common-sense priors: medically/logically expected feature directions ---
   // positive = more of this feature → better mood, negative = more → worse mood
-  // Strength fades as data grows (prior weight = priorStrength / sqrt(n))
+  // Strength fades as data grows (prior weight = priorStrength * priorScale(n))
+  // Pollutants/pollen priors are strong because they're never genuinely good for mood;
+  // any observed correlation (e.g. pollen ↑ on clear days → good mood) is confounding.
   const PRIORS = {
-    pm2_5: -0.3, pm10: -0.3, ozone: -0.2,
-    alder_pollen: -0.3, birch_pollen: -0.3, grass_pollen: -0.3,
-    mugwort_pollen: -0.3, olive_pollen: -0.3, ragweed_pollen: -0.3,
-    pressure_delta: 0.3,   // rising pressure → better
-    pressure_low: -0.4,     // low pressure zone → worse
-    humidity: -0.1,         // high humidity → slightly worse
-    cloudcover: -0.1,       // more clouds → slightly worse
-    precipitation: -0.15,   // rain → worse
+    pm2_5: -0.8, pm10: -0.8, ozone: -0.5,
+    alder_pollen: -0.8, birch_pollen: -0.8, grass_pollen: -0.8,
+    mugwort_pollen: -0.8, olive_pollen: -0.8, ragweed_pollen: -0.8,
+    pressure_delta: 0.4,   // rising pressure → better
+    pressure_low: -0.5,     // low pressure zone → worse
+    humidity: -0.15,        // high humidity → slightly worse
+    cloudcover: -0.15,      // more clouds → slightly worse
+    precipitation: -0.2,    // rain → worse
     windspeed: -0.05        // wind → slightly worse
   };
 
@@ -52,8 +54,9 @@ const Model = (() => {
     const wNeg = nPos > 0 ? (n / (2 * nNeg)) : 1;
     const sampleW = y.map((v) => (v === 1 ? wPos : wNeg));
 
-    // Initialize weights from priors (scaled by data size — less influence with more data)
-    const priorScale = 1 / Math.sqrt(n); // prior fades as n grows
+    // Prior influence: strong with few entries, fades with more data
+    // With 5 entries priorScale=0.45, with 50 entries priorScale=0.14
+    const priorScale = 2 / Math.sqrt(n);
     let w = Weather.FEATURES.map((name, j) => (PRIORS[name] || 0) * priorScale);
     let b = Math.log(nPos / Math.max(nNeg, 1)); // initialize bias to log-odds
     const lr = 0.05, lambda = 0.01, epochs = 800;

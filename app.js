@@ -254,7 +254,7 @@ async function renderPredictions() {
 
     const top = Model.insights(model);
     if (top.length) {
-      insightsEl.innerHTML = `<h3>What seems to affect you most</h3>` + top.map((f) => {
+      insightsEl.innerHTML = `<h3>What seems to affect you most</h3><p class="muted" style="margin-bottom:10px;font-size:0.75rem">Correlation ≠ causation — e.g. high pollen often means clear skies, so it may appear positive when the real cause is weather.</p>` + top.map((f) => {
         const dir = f.weight > 0 ? "higher → better days" : "higher → worse days";
         const strength = Math.abs(f.weight);
         const bar = Math.min(100, Math.round(strength * 40));

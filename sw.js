@@ -1,4 +1,4 @@
-const CACHE = "mood-weather-v13";
+const CACHE = "mood-weather-v14";
 const ASSETS = [
   ".",
   "index.html",
