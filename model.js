@@ -27,7 +27,22 @@ const Model = (() => {
     return 1 / (1 + Math.exp(-Math.max(-50, Math.min(50, z))));
   }
 
-  // --- Logistic Regression with class-weight balancing ---
+  // --- Common-sense priors: medically/logically expected feature directions ---
+  // positive = more of this feature → better mood, negative = more → worse mood
+  // Strength fades as data grows (prior weight = priorStrength / sqrt(n))
+  const PRIORS = {
+    pm2_5: -0.3, pm10: -0.3, ozone: -0.2,
+    alder_pollen: -0.3, birch_pollen: -0.3, grass_pollen: -0.3,
+    mugwort_pollen: -0.3, olive_pollen: -0.3, ragweed_pollen: -0.3,
+    pressure_delta: 0.3,   // rising pressure → better
+    pressure_low: -0.4,     // low pressure zone → worse
+    humidity: -0.1,         // high humidity → slightly worse
+    cloudcover: -0.1,       // more clouds → slightly worse
+    precipitation: -0.15,   // rain → worse
+    windspeed: -0.05        // wind → slightly worse
+  };
+
+  // --- Logistic Regression with class-weight balancing + priors ---
   function trainLR(X, y) {
     const n = X.length, d = X[0].length;
     const nPos = y.filter((v) => v === 1).length;
@@ -37,7 +52,9 @@ const Model = (() => {
     const wNeg = nPos > 0 ? (n / (2 * nNeg)) : 1;
     const sampleW = y.map((v) => (v === 1 ? wPos : wNeg));
 
-    let w = new Array(d).fill(0);
+    // Initialize weights from priors (scaled by data size — less influence with more data)
+    const priorScale = 1 / Math.sqrt(n); // prior fades as n grows
+    let w = Weather.FEATURES.map((name, j) => (PRIORS[name] || 0) * priorScale);
     let b = Math.log(nPos / Math.max(nNeg, 1)); // initialize bias to log-odds
     const lr = 0.05, lambda = 0.01, epochs = 800;
 
@@ -51,7 +68,11 @@ const Model = (() => {
         for (let j = 0; j < d; j++) gw[j] += err * X[i][j];
         gb += err;
       }
-      for (let j = 0; j < d; j++) w[j] -= lr * (gw[j] / n + lambda * w[j]);
+      for (let j = 0; j < d; j++) {
+        const prior = (PRIORS[Weather.FEATURES[j]] || 0) * priorScale;
+        // L2 regularization pulls toward prior, not toward zero
+        w[j] -= lr * (gw[j] / n + lambda * (w[j] - prior));
+      }
       b -= lr * (gb / n);
     }
     return { w, b };
