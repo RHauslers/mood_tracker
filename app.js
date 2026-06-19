@@ -174,19 +174,41 @@ async function renderPredictions() {
       const pct = Math.round(p * 100);
       const color = p >= 0.6 ? "var(--good)" : p <= 0.4 ? "var(--bad)" : "#f39c12";
       const label = new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+      // Per-day reasoning from LR feature contributions
+      const reasons = Model.explain(model, day.features, 3);
+      const knnInfo = Model.explainKNN(model, day.features);
+      const reasonHtml = reasons.map((r) => {
+        const dir = r.contribution > 0 ? "↑" : "↓";
+        const effect = r.contribution > 0 ? "good" : "bad";
+        const val = r.raw != null ? (Number.isInteger(r.raw) ? r.raw : r.raw.toFixed(1)) : "";
+        return `<span class="reason ${effect}">${dir} ${FEATURE_LABELS[r.name]}${val ? " (" + val + ")" : ""}</span>`;
+      }).join("");
+      const knnHtml = `<span class="reason knn">${knnInfo.goodCount}/${knnInfo.total} similar days were good</span>`;
+
       return `
         <div class="pred">
-          <div class="day">${label}</div>
-          <div class="bar-wrap"><div class="bar" style="width:${pct}%;background:${color}"></div></div>
-          <div class="score" style="color:${color}">${pct}%</div>
+          <div class="pred-top">
+            <div class="day">${label}</div>
+            <div class="bar-wrap"><div class="bar" style="width:${pct}%;background:${color}"></div></div>
+            <div class="score" style="color:${color}">${pct}%</div>
+          </div>
+          <div class="pred-reasons">${reasonHtml}${knnHtml}</div>
         </div>`;
     }).join("");
 
     const top = Model.insights(model);
     if (top.length) {
-      insightsEl.innerHTML = `<h3>What seems to affect you</h3>` + top.map((f) => {
+      insightsEl.innerHTML = `<h3>What seems to affect you most</h3>` + top.map((f) => {
         const dir = f.weight > 0 ? "higher → better days" : "higher → worse days";
-        return `<div class="kv" style="display:flex;justify-content:space-between"><span>${FEATURE_LABELS[f.name]}</span><span class="muted">${dir}</span></div>`;
+        const strength = Math.abs(f.weight);
+        const bar = Math.min(100, Math.round(strength * 40));
+        const barColor = f.weight > 0 ? "var(--good)" : "var(--bad)";
+        return `<div class="insight-row">
+          <span class="insight-name">${FEATURE_LABELS[f.name]}</span>
+          <div class="insight-bar-wrap"><div class="insight-bar" style="width:${bar}%;background:${barColor}"></div></div>
+          <span class="insight-dir muted">${dir}</span>
+        </div>`;
       }).join("");
       insightsEl.classList.remove("hidden");
     }

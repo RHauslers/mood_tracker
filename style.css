@@ -266,6 +266,8 @@ h2 { font-size: 1.1rem; margin-bottom: 12px; }
   background: var(--card);
   border-radius: var(--radius);
   padding: 12px 14px;
+}
+.pred-top {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -279,6 +281,39 @@ h2 { font-size: 1.1rem; margin-bottom: 12px; }
 }
 .pred .bar { height: 100%; border-radius: 999px; }
 .pred .score { min-width: 56px; text-align: right; font-size: 0.85rem; font-weight: 600; }
+
+.pred-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.reason {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.reason.good { background: rgba(46,204,113,0.15); color: var(--good); }
+.reason.bad { background: rgba(231,76,60,0.15); color: var(--bad); }
+.reason.knn { background: rgba(79,140,255,0.15); color: var(--accent); }
+
+.insight-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.insight-name { font-size: 0.85rem; min-width: 120px; }
+.insight-bar-wrap {
+  flex: 1; height: 6px;
+  background: #2a2e38;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.insight-bar { height: 100%; border-radius: 999px; }
+.insight-dir { font-size: 0.78rem; min-width: 130px; text-align: right; }
 
 .tabs {
   position: fixed;

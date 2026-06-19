@@ -164,9 +164,37 @@ const Model = (() => {
     return ranked.slice(0, topN).filter((f) => Math.abs(f.weight) > 0.01);
   }
 
+  // --- Explain a single prediction: which features contributed most ---
+  function explain(model, features, topN = 3) {
+    const vec = featureVector(features);
+    const x = normalize(vec, model.stats);
+    const contributions = Weather.FEATURES.map((name, j) => ({
+      name,
+      raw: vec[j],
+      contribution: model.lrModel.w[j] * x[j] // signed: positive = toward good
+    })).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+    // Only return features with meaningful contribution
+    return contributions.slice(0, topN).filter((f) => Math.abs(f.contribution) > 0.02);
+  }
+
+  // --- kNN explanation: what were the nearest neighbors like? ---
+  function explainKNN(model, features, k = 5) {
+    const vec = featureVector(features);
+    const x = normalize(vec, model.stats);
+    const distances = model.trainX.map((row, i) => ({
+      d: euclidean(row, x),
+      label: model.trainY[i]
+    }));
+    distances.sort((a, b) => a.d - b.d);
+    const neighbors = distances.slice(0, Math.min(k, distances.length));
+    const goodCount = neighbors.filter((nb) => nb.label === 1).length;
+    const badCount = neighbors.length - goodCount;
+    return { goodCount, badCount, total: neighbors.length };
+  }
+
   function modelLabel(model) {
     return model.saturated ? "kNN" : "Ensemble (LR + kNN)";
   }
 
-  return { MIN_ENTRIES, train, predict, insights, modelLabel, addPressureFeaturesForForecast };
+  return { MIN_ENTRIES, train, predict, insights, explain, explainKNN, modelLabel, addPressureFeaturesForForecast };
 })();
