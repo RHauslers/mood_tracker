@@ -23,6 +23,9 @@ const FEATURE_LABELS = {
   pressure_low: "Low pressure zone"
 };
 
+const BAD_TAGS = ["Headache", "Fatigue", "Heaviness", "Brain fog", "Anxiety", "Irritability", "Body pain", "Nausea", "Dizziness", "Insomnia"];
+const GOOD_TAGS = ["Energetic", "Calm", "Focused", "Creative", "Motivated", "Relaxed", "Social", "Restful sleep"];
+
 const $ = (id) => document.getElementById(id);
 
 function loadEntries() {
@@ -45,14 +48,14 @@ function setButtonsDisabled(disabled) {
 
 /* ---------- Logging ---------- */
 
-async function logMood(mood, date, weather, lat, lon) {
+async function logMood(mood, date, weather, lat, lon, tags) {
   setButtonsDisabled(true);
   setStatus("Saving entry…");
   try {
     const entries = loadEntries();
     const targetDate = date || new Date().toISOString().slice(0, 10);
     const existing = entries.findIndex((e) => e.date === targetDate);
-    const entry = { date: targetDate, mood, lat: lat ?? null, lon: lon ?? null, weather, ts: Date.now() };
+    const entry = { date: targetDate, mood, lat: lat ?? null, lon: lon ?? null, weather, ts: Date.now(), tags: tags || [] };
     if (existing >= 0) entries[existing] = entry;
     else entries.push(entry);
     saveEntries(entries);
@@ -73,19 +76,63 @@ async function logMood(mood, date, weather, lat, lon) {
   }
 }
 
+/* ---------- Tag picker ---------- */
+
+let pendingMood = null;
+let selectedTags = [];
+
+function showTagPicker(mood) {
+  pendingMood = mood;
+  selectedTags = [];
+  const tags = mood === "bad" ? BAD_TAGS : GOOD_TAGS;
+  $("tag-picker-title").textContent = mood === "bad" ? "What's bothering you?" : "What's making it good?";
+  $("tag-options").innerHTML = tags.map((t) =>
+    `<span class="tag-opt ${mood}-tag" data-tag="${t}">${t}</span>`
+  ).join("");
+  // Wire click handlers
+  $("tag-options").querySelectorAll(".tag-opt").forEach((el) => {
+    el.addEventListener("click", () => {
+      const tag = el.dataset.tag;
+      if (selectedTags.includes(tag)) {
+        selectedTags = selectedTags.filter((t) => t !== tag);
+        el.classList.remove("selected");
+      } else {
+        selectedTags.push(tag);
+        el.classList.add("selected");
+      }
+    });
+  });
+  $("tag-picker").classList.remove("hidden");
+}
+
+function hideTagPicker() {
+  $("tag-picker").classList.add("hidden");
+  selectedTags = [];
+  pendingMood = null;
+}
+
 async function logMoodToday(mood) {
+  showTagPicker(mood);
+}
+
+async function confirmLogMood() {
+  const mood = pendingMood;
+  const tags = selectedTags.slice();
+  hideTagPicker();
   setButtonsDisabled(true);
   setStatus("Getting your location…");
   try {
     const { lat, lon } = await Weather.getPosition();
     setStatus("Fetching weather data…");
     const weather = await Weather.getCurrent(lat, lon);
-    await logMood(mood, null, weather, lat, lon);
+    await logMood(mood, null, weather, lat, lon, tags);
   } catch (err) {
     setStatus("⚠️ " + err.message);
     setButtonsDisabled(false);
   }
 }
+
+$("btn-tag-skip").addEventListener("click", () => confirmLogMood());
 
 function renderTodayCard(entry) {
   const card = $("today-card");
@@ -94,8 +141,11 @@ function renderTodayCard(entry) {
     .filter((k) => w[k] !== undefined && w[k] !== null)
     .map((k) => `<div class="kv"><span>${FEATURE_LABELS[k]}</span><span>${round1(w[k])}</span></div>`)
     .join("");
+  const tagsHtml = (entry.tags && entry.tags.length)
+    ? `<div class="entry-tags">${entry.tags.map((t) => `<span class="entry-tag ${entry.mood}">${t}</span>`).join("")}</div>` : "";
   card.innerHTML = `
     <h3>${entry.mood === "good" ? "😊 Good day" : "😞 Bad day"} — ${entry.date}</h3>
+    ${tagsHtml}
     <div class="weather-grid">${rows}</div>`;
   card.classList.remove("hidden");
 }
@@ -114,15 +164,20 @@ function renderHistory() {
     list.innerHTML = `<p class="muted">No entries yet. Log your first day!</p>`;
     return;
   }
-  list.innerHTML = entries.map((e) => `
+  list.innerHTML = entries.map((e) => {
+    const tagsHtml = (e.tags && e.tags.length)
+      ? `<div class="entry-tags">${e.tags.map((t) => `<span class="entry-tag ${e.mood}">${t}</span>`).join("")}</div>` : "";
+    return `
     <div class="entry">
       <div class="dot ${e.mood}"></div>
       <div class="info">
         <div class="date">${e.date}</div>
         <div class="detail">${round1(e.weather.temperature)}°C · ${round1(e.weather.humidity)}% hum · ${round1(e.weather.pressure)} hPa · ${round1(e.weather.cloudcover)}% clouds</div>
+        ${tagsHtml}
       </div>
       <button class="del" data-date="${e.date}" aria-label="Delete entry">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   list.querySelectorAll(".del").forEach((btn) =>
     btn.addEventListener("click", () => {

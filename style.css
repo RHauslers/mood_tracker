@@ -197,6 +197,41 @@ html, body {
 .card h3 { font-size: 1rem; margin-bottom: 8px; }
 .hidden { display: none; }
 
+.tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.tag-opt {
+  background: #21252c;
+  border: 1px solid #2a2e38;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.tag-opt:hover { background: #2a2e38; color: var(--text); }
+.tag-opt.selected { border-color: var(--accent); color: var(--accent); background: rgba(79,140,255,0.12); }
+.tag-opt.selected.bad-tag { border-color: var(--bad); color: var(--bad); background: rgba(231,76,60,0.12); }
+.tag-opt.selected.good-tag { border-color: var(--good); color: var(--good); background: rgba(46,204,113,0.12); }
+
+.entry-tags { margin-top: 3px; }
+.entry-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-right: 4px;
+}
+.entry-tag.bad { background: rgba(231,76,60,0.15); color: var(--bad); }
+.entry-tag.good { background: rgba(46,204,113,0.15); color: var(--good); }
+
 .weather-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
