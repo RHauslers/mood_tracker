@@ -178,8 +178,13 @@ const Model = (() => {
 
     if (knnInfo.total > 0) {
       const ratio = knnInfo.goodCount / knnInfo.total;
-      if (ratio >= 0.8) parts.push("Matches your best days");
-      else if (ratio <= 0.2) parts.push("Matches your worst days");
+      const top = reasons[0];
+      const topIsGood = top ? top.contribution > 0 : false;
+      // Only say "Matches your best/worst days" if the top feature agrees with the kNN sentiment.
+      // Otherwise show the explicit count to avoid contradictions like
+      // "Higher air pollution · Matches your best days".
+      if (topIsGood && ratio >= 0.8) parts.push("Matches your best days");
+      else if (!topIsGood && ratio <= 0.2) parts.push("Matches your worst days");
       else parts.push(knnInfo.goodCount + "/" + knnInfo.total + " similar days were good");
     }
 
