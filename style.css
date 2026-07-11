@@ -333,6 +333,35 @@ h2 { font-size: 1.1rem; margin-bottom: 12px; }
 .reason.good { background: rgba(46,204,113,0.15); color: var(--good); }
 .reason.bad { background: rgba(231,76,60,0.15); color: var(--bad); }
 .reason.knn { background: rgba(79,140,255,0.15); color: var(--accent); }
+.reason.note { background: #2a2e38; color: var(--muted); }
+
+.pred-confidence {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.confidence {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.confidence.low { background: rgba(243,156,18,0.15); color: #f39c12; }
+.confidence.medium { background: rgba(79,140,255,0.15); color: var(--accent); }
+.confidence.high { background: rgba(46,204,113,0.15); color: var(--good); }
+
+.accuracy-card {
+  background: #1a1d24;
+  border: 1px solid #2a2e38;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
 
 .insight-row {
   display: flex;

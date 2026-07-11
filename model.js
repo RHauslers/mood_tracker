@@ -2,7 +2,10 @@
    Trains in milliseconds, predicts 0..1 probability a day feels good. */
 
 const Model = (() => {
-  const MIN_ENTRIES = 5;
+  const MIN_ENTRIES = 3;         // allow experimental predictions with fewer entries
+  const IDEAL_ENTRIES = 10;      // threshold for full confidence
+  const MIN_CONFIDENCE = 0.05;   // minimum clamped confidence for low-data predictions
+  const MAX_CONFIDENCE = 0.95;   // never be fully certain
 
   function featureVector(features) {
     return Weather.FEATURES.map((k) => Number(features[k]) || 0);
@@ -139,6 +142,89 @@ const Model = (() => {
     });
   }
 
+  // --- Confidence / uncertainty ---
+  function confidence(model, nEntries) {
+    // Data-driven uncertainty: how much do the top neighbors disagree?
+    // Base it also on the number of entries and class balance.
+    const nPos = model.trainY.filter((v) => v === 1).length;
+    const nNeg = model.trainY.length - nPos;
+    const balance = Math.min(nPos, nNeg) / Math.max(nPos, nNeg, 1); // 1 = balanced, 0 = only one class
+    const size = Math.min(1, (nEntries - MIN_ENTRIES) / (IDEAL_ENTRIES - MIN_ENTRIES));
+    return Math.max(MIN_CONFIDENCE, Math.min(MAX_CONFIDENCE, 0.3 + 0.5 * size + 0.2 * balance));
+  }
+
+  function confidenceLabel(nEntries, conf) {
+    if (nEntries < MIN_ENTRIES) return "no prediction";
+    if (nEntries < IDEAL_ENTRIES) return "experimental — " + Math.round(conf * 100) + "% confident";
+    if (conf < 0.55) return "uncertain";
+    if (conf < 0.75) return "fairly confident";
+    return "confident";
+  }
+
+  // --- Plain-language explanation for a single prediction ---
+  function plainExplain(model, features, nEntries) {
+    const parts = [];
+    const reasons = explain(model, features, 3);
+    const knnInfo = explainKNN(model, features, 5);
+
+    if (reasons.length) {
+      const top = reasons[0];
+      const label = Weather.FEATURES[top.name] ? top.name : top.name;
+      const direction = top.contribution > 0 ? "good" : "bad";
+      // Pick a human-friendly phrase for the top feature
+      const phrase = featurePhrase(label, top.raw, top.contribution > 0);
+      if (phrase) parts.push(phrase);
+    }
+
+    if (knnInfo.total > 0) {
+      const ratio = knnInfo.goodCount / knnInfo.total;
+      if (ratio >= 0.8) parts.push("Matches your best days");
+      else if (ratio <= 0.2) parts.push("Matches your worst days");
+      else parts.push(knnInfo.goodCount + "/" + knnInfo.total + " similar days were good");
+    }
+
+    if (nEntries < IDEAL_ENTRIES) {
+      parts.push("Low data — confidence is experimental");
+    }
+
+    return parts.join(" · ");
+  }
+
+  function featurePhrase(name, raw, isGood) {
+    const val = Number(raw) || 0;
+    const dir = isGood ? "good" : "bad";
+    if (name === "temperature") {
+      if (isGood) return val > 20 ? "Warm and pleasant" : "Mild temperature";
+      return val < 8 ? "Very cold" : "Cool temperature";
+    }
+    if (name === "windspeed") {
+      if (isGood) return val < 10 ? "Calm" : "Breezy";
+      return val > 20 ? "Very windy" : "Windy";
+    }
+    if (name === "pressure_delta") {
+      return val > 0 ? "Pressure rising" : "Pressure falling";
+    }
+    if (name === "pressure_low") {
+      return isGood ? "Normal pressure" : "Low pressure zone";
+    }
+    if (name.includes("pollen")) {
+      return isGood ? "Low pollen" : "High pollen";
+    }
+    if (name === "pm2_5" || name === "pm10" || name === "ozone") {
+      return isGood ? "Clean air" : "Higher air pollution";
+    }
+    if (name === "cloudcover") {
+      return isGood ? (val > 50 ? "Overcast" : "Sunny") : (val > 50 ? "Gloomy" : "Too bright?");
+    }
+    if (name === "humidity") {
+      return isGood ? "Comfortable humidity" : "High humidity";
+    }
+    if (name === "precipitation") {
+      return isGood ? "Dry" : "Wet / rainy";
+    }
+    return (isGood ? "Higher " : "Lower ") + (FEATURE_LABELS[name] || name);
+  }
+
   // --- Public train ---
   function train(entries) {
     if (entries.length < MIN_ENTRIES) return null;
@@ -161,7 +247,11 @@ const Model = (() => {
     // Store last known pressure so forecast deltas can be computed
     const lastPressure = sorted[sorted.length - 1].weather.pressure || 1013;
 
-    return { lrModel, trainX: X, trainY: y, stats, saturated, lastPressure };
+    const model = { lrModel, trainX: X, trainY: y, stats, saturated, lastPressure };
+    model.confidence = confidence(model, entries.length);
+    model.nEntries = entries.length;
+    model.label = confidenceLabel(entries.length, model.confidence);
+    return model;
   }
 
   // --- Public predict: ensemble LR + kNN, clamp to 5-95% ---
@@ -220,5 +310,5 @@ const Model = (() => {
     return model.saturated ? "kNN" : "Ensemble (LR + kNN)";
   }
 
-  return { MIN_ENTRIES, train, predict, insights, explain, explainKNN, modelLabel, addPressureFeaturesForForecast };
+  return { MIN_ENTRIES, IDEAL_ENTRIES, train, predict, confidence, confidenceLabel, insights, explain, explainKNN, plainExplain, modelLabel, addPressureFeaturesForForecast };
 })();

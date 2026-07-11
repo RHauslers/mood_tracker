@@ -1,6 +1,8 @@
 /* App logic: logging, history, predictions, persistence */
 
 const STORAGE_KEY = "mood_weather_entries_v1";
+const ACCURACY_KEY = "mood_weather_accuracy_v1";
+const PREDICTIONS_KEY = "mood_weather_predictions_v1";
 
 const FEATURE_LABELS = {
   temperature: "Temp (°C)",
@@ -37,6 +39,47 @@ function saveEntries(entries) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
 }
 
+function loadAccuracy() {
+  try { return JSON.parse(localStorage.getItem(ACCURACY_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveAccuracy(acc) {
+  localStorage.setItem(ACCURACY_KEY, JSON.stringify(acc));
+}
+
+function loadPredictions() {
+  try { return JSON.parse(localStorage.getItem(PREDICTIONS_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function savePredictions(preds) {
+  localStorage.setItem(PREDICTIONS_KEY, JSON.stringify(preds));
+}
+
+function checkAndRecordAccuracy(date, actualMood) {
+  const preds = loadPredictions();
+  if (preds[date] !== undefined) {
+    recordPrediction(date, preds[date], actualMood);
+  }
+}
+
+function recordPrediction(date, predictedGood, actualMood) {
+  const acc = loadAccuracy();
+  const actual = actualMood === "good" ? 1 : 0;
+  const idx = acc.findIndex((a) => a.date === date);
+  const entry = { date, predicted: predictedGood, actual };
+  if (idx >= 0) acc[idx] = entry; else acc.push(entry);
+  saveAccuracy(acc);
+}
+
+function accuracyStats() {
+  const acc = loadAccuracy();
+  if (!acc.length) return null;
+  const correct = acc.filter((a) => (a.predicted >= 0.5) === (a.actual === 1)).length;
+  return { total: acc.length, correct, pct: Math.round((correct / acc.length) * 100) };
+}
+
 function setStatus(msg) {
   $("status").textContent = msg;
 }
@@ -59,6 +102,9 @@ async function logMood(mood, date, weather, lat, lon, tags) {
     if (existing >= 0) entries[existing] = entry;
     else entries.push(entry);
     saveEntries(entries);
+
+    // If a previous prediction exists for this date, grade it
+    checkAndRecordAccuracy(targetDate, mood);
 
     if (!date) {
       setStatus(existing >= 0 ? "Today's entry updated." : "Entry saved!");
@@ -201,8 +247,9 @@ async function renderPredictions() {
   modelPill.classList.add("hidden");
   list.innerHTML = "";
 
-  if (entries.length < Model.MIN_ENTRIES) {
-    info.textContent = `Need at least ${Model.MIN_ENTRIES} entries to train the AI. You have ${entries.length}.`;
+  const min = Model.MIN_ENTRIES;
+  if (entries.length < min) {
+    info.textContent = `Need at least ${min} entries to train the AI. You have ${entries.length}.`;
     return;
   }
 
@@ -219,7 +266,11 @@ async function renderPredictions() {
     const ref = withLocation || entries[entries.length - 1];
     const rawForecast = await Weather.getForecast(ref.lat, ref.lon);
     const forecast = Model.addPressureFeaturesForForecast(rawForecast, model.lastPressure);
-    info.textContent = `Based on your ${entries.length} entries, likelihood each day will feel good:`;
+
+    const acc = accuracyStats();
+    const accText = acc ? `Model accuracy so far: ${acc.correct}/${acc.total} (${acc.pct}%)` : "Not enough predictions logged yet to measure accuracy.";
+    const confText = model.label;
+    info.textContent = `Based on your ${entries.length} entries (${confText})`;
 
     modelPill.textContent = Model.modelLabel(model);
     modelPill.classList.remove("hidden");
@@ -229,17 +280,8 @@ async function renderPredictions() {
       const pct = Math.round(p * 100);
       const color = p >= 0.6 ? "var(--good)" : p <= 0.4 ? "var(--bad)" : "#f39c12";
       const label = new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-
-      // Per-day reasoning from LR feature contributions
-      const reasons = Model.explain(model, day.features, 3);
-      const knnInfo = Model.explainKNN(model, day.features);
-      const reasonHtml = reasons.map((r) => {
-        const dir = r.contribution > 0 ? "↑" : "↓";
-        const effect = r.contribution > 0 ? "good" : "bad";
-        const val = r.raw != null ? (Number.isInteger(r.raw) ? r.raw : r.raw.toFixed(1)) : "";
-        return `<span class="reason ${effect}">${dir} ${FEATURE_LABELS[r.name]}${val ? " (" + val + ")" : ""}</span>`;
-      }).join("");
-      const knnHtml = `<span class="reason knn">${knnInfo.goodCount}/${knnInfo.total} similar days were good</span>`;
+      const plain = Model.plainExplain(model, day.features, model.nEntries);
+      const confBadge = `<span class="confidence ${model.confidence < 0.5 ? 'low' : model.confidence < 0.75 ? 'medium' : 'high'}">${model.label}</span>`;
 
       return `
         <div class="pred">
@@ -248,9 +290,17 @@ async function renderPredictions() {
             <div class="bar-wrap"><div class="bar" style="width:${pct}%;background:${color}"></div></div>
             <div class="score" style="color:${color}">${pct}%</div>
           </div>
-          <div class="pred-reasons">${reasonHtml}${knnHtml}</div>
+          <div class="pred-confidence">${confBadge}</div>
+          <div class="pred-reasons">${plain ? `<span class="reason note">${plain}</span>` : ""}</div>
         </div>`;
     }).join("");
+
+    // Save current predictions for future accuracy grading
+    const preds = {};
+    forecast.forEach((day) => {
+      preds[day.date] = Model.predict(model, day.features);
+    });
+    savePredictions(preds);
 
     const top = Model.insights(model);
     if (top.length) {
@@ -266,6 +316,11 @@ async function renderPredictions() {
         </div>`;
       }).join("");
       insightsEl.classList.remove("hidden");
+    }
+
+    // Show accuracy card below insights
+    if (acc) {
+      insightsEl.innerHTML += `<div class="accuracy-card">${accText}</div>`;
     }
   } catch (err) {
     info.textContent = "⚠️ Could not fetch forecast: " + err.message;
